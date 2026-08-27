@@ -1,0 +1,796 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>四季宝</title>
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+
+    <style>
+        .markdown-body { line-height: 1.6; word-wrap: break-word; font-size: 15px; }
+        .markdown-body table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 16px 0;
+        }
+        .markdown-body th,
+        .markdown-body td {
+            padding: 8px;
+            border: 1px solid #e5e7eb;
+            text-align: left;
+        }
+        .markdown-body th {
+            background-color: #f3f4f6;
+            font-weight: 600;
+        }
+        .markdown-body tr:nth-child(even) {
+            background-color: #f9fafb;
+        }
+        .reasoning-markdown {
+            color: #9ca3af !important;
+            font-size: 0.875rem !important;
+            font-style: italic;
+            line-height: 1.6 !important;
+            border-left: 2px solid #e5e7eb;
+            padding-left: 12px;
+            margin-top: 8px;
+            margin-bottom: 12px;
+            min-height: 80px;
+        }
+        .reasoning-content { transition: max-height 0.15s ease-out, opacity 0.15s ease; overflow: hidden; }
+        .reasoning-collapsed { max-height: 90px; opacity: 1; pointer-events: auto; margin-bottom: 0; overflow-y: auto; }
+        .reasoning-expanded { max-height: 2000px; opacity: 1; margin-bottom: 12px; }
+
+        .rotate-icon { transition: transform 0.3s ease; }
+        .rotated { transform: rotate(90deg); }
+
+        .hide-scrollbar::-webkit-scrollbar { display: none; }
+        .thinking-dot { animation: pulse 1.5s infinite; }
+        @keyframes pulse { 0%, 100% { opacity: 0.4; } 50% { opacity: 1; } }
+
+        .view-transition { transition: opacity 0.4s ease-in-out; }
+        .hidden-view { display: none !important; opacity: 0; }
+
+        #sidebar { transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+        #sidebar-overlay { transition: opacity 0.3s ease; }
+
+        .user-bubble { background-color: #036C6C; border-radius: 1.25rem 1.25rem 0.25rem 1.25rem; }
+        .bot-bubble { background-color: white; border-radius: 1.25rem 1.25rem 1.25rem 0.25rem; border: 1px solid #f3f4f6; max-width: 66.67%; }
+
+        .wechat-audio-wrapper {
+            background-color: rgba(0, 0, 0, 0.1);
+            border-radius: 0.75rem;
+            padding: 0.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            max-width: 300px;
+        }
+        .wechat-audio-wrapper .duration {
+            font-size: 0.75rem;
+            color: #6b7280;
+            min-width: 40px;
+        }
+        .wechat-audio-wrapper .transcript {
+            font-size: 0.875rem;
+            color: #f3f4f6;
+            margin-top: 0.25rem;
+            padding-left: 0.75rem;
+            border-left: 2px solid rgba(255, 255, 255, 0.3);
+        }
+
+        #chat-window img {
+            max-width: 100%;
+            max-height: 300px;
+            height: auto;
+            object-fit: contain;
+            border-radius: 8px;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 h-screen overflow-hidden flex flex-col font-sans">
+
+    <div id="welcome-view" class="view-transition fixed inset-0 z-50 h-screen w-full flex flex-col items-center justify-center bg-white px-6">
+        <div class="max-w-md w-full">
+            <div class="mb-10 text-center">
+                <div class="inline-block p-6 bg-[#036C6C]/10 rounded-[2.5rem] shadow-inner mb-6">
+                    <i class="fas fa-leaf text-6xl text-[#036C6C]"></i>
+                </div>
+                <h1 class="text-4xl font-black text-gray-900 tracking-tight mb-2">四季宝</h1>
+                <p class="text-gray-500 text-lg">基于多模态LLM的智慧农业平台</p>
+            </div>
+
+            <div class="bg-gray-50 p-8 rounded-[2.5rem] border border-gray-100 shadow-sm space-y-5">
+                <div>
+                    <label class="text-xs font-bold text-gray-400 uppercase tracking-widest ml-1 mb-2 block">如何称呼您</label>
+                    <input type="text" id="init-nickname" class="w-full bg-white px-5 py-3 rounded-xl border border-gray-200 focus:border-[#036C6C] outline-none transition-all" placeholder="例如：老王" data-default="老王">
+                </div>
+                <div>
+                    <label class="text-xs font-bold text-gray-400 uppercase tracking-widest ml-1 mb-2 block">所在地</label>
+                    <input type="text" id="init-region" class="w-full bg-white px-5 py-3 rounded-xl border border-gray-200 focus:border-[#036C6C] outline-none transition-all" placeholder="例如：甘肃兰州" data-default="甘肃兰州">
+                </div>
+                <div>
+                    <label class="text-xs font-bold text-gray-400 uppercase tracking-widest ml-1 mb-2 block">种植作物</label>
+                    <input type="text" id="init-crops" class="w-full bg-white px-5 py-3 rounded-xl border border-gray-200 focus:border-[#036C6C] outline-none transition-all" placeholder="例如：土豆" data-default="土豆">
+                </div>
+                <div>
+                    <label class="text-xs font-bold text-gray-400 uppercase tracking-widest ml-1 mb-2 block">备注（选填）</label>
+                    <textarea id="init-remarks" rows="1" class="w-full bg-white px-5 py-3 rounded-xl border border-gray-200 focus:border-[#036C6C] outline-none transition-all resize-none" placeholder="例如：土壤偏酸性，去年发生过晚疫病"></textarea>
+                </div>
+                <button onclick="handleInitialSetup()" class="w-full bg-[#036C6C] hover:bg-[#036C6C]/80 text-white font-bold py-5 rounded-2xl shadow-xl transition-all active:scale-95 flex items-center justify-center space-x-2">
+                    <span>开启智能诊断</span>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                </button>
+            </div>
+            
+            <p class="text-center text-xs text-gray-400 mt-6 px-4">您填写的信息旨在为您提供量身定制的服务，我们不会收集用户信息</p>
+        </div>
+    </div>
+
+    <div id="main-view" class="view-transition h-screen flex flex-col hidden-view relative">
+
+        <header class="bg-white border-b p-4 flex justify-between items-center shadow-sm z-20">
+            <div class="flex items-center space-x-3">
+                <div class="bg-[#036C6C] text-white p-2 rounded-xl">
+                    <i class="fas fa-seedling"></i>
+                </div>
+                <div>
+                    <h1 id="header-display-title" class="font-bold text-gray-800 leading-tight">四季宝</h1>
+                    <p id="header-display-info" class="text-[10px] text-gray-400 uppercase tracking-wider font-bold"></p>
+                </div>
+            </div>
+            <button onclick="toggleSidebar()" class="w-10 h-10 flex items-center justify-center rounded-full text-gray-500 hover:bg-gray-100 transition-all">
+                <i class="fas fa-id-card text-xl"></i>
+            </button>
+        </header>
+
+        <div class="flex flex-1 overflow-hidden relative">
+            <main id="chat-window" class="flex-1 overflow-y-auto p-4 space-y-6 hide-scrollbar bg-gray-100"></main>
+
+            <div id="sidebar-overlay" onclick="toggleSidebar()" class="fixed inset-0 bg-black/40 z-30 opacity-0 pointer-events-none transition-opacity"></div>
+
+            <aside id="sidebar" class="fixed inset-y-0 right-0 z-40 w-80 bg-white shadow-2xl transform translate-x-full">
+                <div class="h-full flex flex-col p-6">
+                    <div class="flex justify-between items-center mb-8">
+                        <h2 class="text-xl font-bold text-gray-800"><i class="fas fa-user-circle mr-2 text-[#036C6C]"></i>农场档案</h2>
+                        <button onclick="toggleSidebar()" class="text-gray-400 hover:text-gray-600 text-2xl">&times;</button>
+                    </div>
+
+                    <div class="space-y-6 flex-1 overflow-y-auto pr-2 hide-scrollbar">
+                        <div class="space-y-2">
+                            <label class="text-xs font-bold text-gray-400 uppercase tracking-widest">称呼</label>
+                            <input type="text" id="side-nickname" class="w-full bg-gray-50 px-4 py-3 rounded-xl border border-transparent focus:bg-white focus:border-[#036C6C] outline-none text-sm transition-all">
+                        </div>
+                        <div class="space-y-2">
+                            <label class="text-xs font-bold text-gray-400 uppercase tracking-widest">地区</label>
+                            <input type="text" id="side-region" class="w-full bg-gray-50 px-4 py-3 rounded-xl border border-transparent focus:bg-white focus:border-[#036C6C] outline-none text-sm transition-all">
+                        </div>
+                        <div class="space-y-2">
+                            <label class="text-xs font-bold text-gray-400 uppercase tracking-widest">主要作物</label>
+                            <input type="text" id="side-crops" class="w-full bg-gray-50 px-4 py-3 rounded-xl border border-transparent focus:bg-white focus:border-[#036C6C] outline-none text-sm transition-all">
+                        </div>
+                        <div class="space-y-2">
+                            <label class="text-xs font-bold text-gray-400 uppercase tracking-widest">备注</label>
+                            <textarea id="side-remarks" rows="1" class="w-full bg-gray-50 px-4 py-3 rounded-xl border border-transparent focus:bg-white focus:border-[#036C6C] outline-none text-sm transition-all resize-none" placeholder="土壤条件、历史病虫害等"></textarea>
+                        </div>
+                        <button onclick="updateProfile()" class="w-full bg-[#036C6C] text-white font-bold py-3 rounded-xl shadow-lg hover:bg-[#036C6C]/80 transition-all">保存更改</button>
+                        <button onclick="resetUser()" class="w-full bg-red-700 text-white font-bold py-3 rounded-xl shadow-lg hover:bg-red-800 transition-all">清除所有本地数据并重置</button>
+                    </div>
+                </div>
+            </aside>
+        </div>
+
+        <footer class="bg-white p-4 border-t z-10 shadow-[0_-10px_20px_rgba(0,0,0,0.02)]">
+            <div class="max-w-4xl mx-auto">
+                <div id="recording-status" class="hidden mb-3 p-3 bg-[#036C6C]/5 rounded-xl flex items-center space-x-3">
+                    <div class="w-3 h-3 bg-red-500 rounded-full animate-pulse"></div>
+                    <span class="text-sm text-[#036C6C]">正在录音... 点击按钮停止</span>
+                    <span id="recording-time" class="text-xs text-gray-500">00:00</span>
+                </div>
+                <div id="image-preview-container" class="hidden mb-3 relative inline-block animate-in fade-in slide-in-from-bottom-2">
+                    <img id="image-preview" src="" class="h-24 w-24 object-cover rounded-2xl border-2 border-[#036C6C] shadow-lg">
+                    <button onclick="clearImage()" class="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center shadow-md">
+                        <i class="fas fa-times text-[10px]"></i>
+                    </button>
+                </div>
+                <div class="flex items-end space-x-3">
+                    <label id="camera-label" class="cursor-pointer bg-gray-100 p-4 rounded-2xl hover:bg-[#036C6C]/10 transition-all group">
+                        <i class="fas fa-camera text-gray-500 group-hover:text-[#036C6C] transition-colors"></i>
+                        <input type="file" id="file-input" class="hidden" accept="image/*" onchange="previewFile()">
+                    </label>
+
+                    <button onclick="toggleRecording()" id="recording-button" class="cursor-pointer bg-gray-100 p-4 rounded-2xl hover:bg-[#036C6C]/10 transition-all group">
+                        <i class="fas fa-microphone text-gray-500 group-hover:text-[#036C6C] transition-colors"></i>
+                    </button>
+
+                    <textarea id="user-input" rows="1" class="flex-1 bg-gray-100 rounded-2xl p-4 outline-none focus:ring-2 focus:ring-[#036C6C] resize-none transition-all" placeholder="描述作物问题..."></textarea>
+                    <button onclick="sendMessage()" id="send-btn" class="bg-[#036C6C] text-white w-14 h-14 rounded-2xl shadow-lg flex items-center justify-center active:scale-90 transition-all hover:bg-[#036C6C]/80">
+                        <i class="fas fa-paper-plane"></i>
+                    </button>
+                </div>
+            </div>
+        </footer>
+    </div>
+    <div id="image-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/80" onclick="closeImageModal()">
+        <div class="relative max-w-4xl max-h-[90vh]" onclick="event.stopPropagation()">
+            <img id="modal-image" src="" class="max-w-full max-h-[90vh] object-contain">
+            <button onclick="closeImageModal()" class="absolute top-4 right-4 bg-white/20 backdrop-blur-sm text-white w-10 h-10 rounded-full flex items-center justify-center hover:bg-white/40 transition-all">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+    </div>
+
+    <script>
+
+        let currentImage = null;
+        let currentAudio = null;
+        let mediaRecorder = null;
+        let audioChunks = [];
+        let recordingTimer = null;
+        let recordingDuration = 0;
+        let lastRecordingDuration = 0;
+        const MAX_RECORDING_DURATION = 60;
+        let isPressing = false;
+
+        const renderer = new marked.Renderer();
+        renderer.del = function(text) {
+            return text;
+        };
+        
+        marked.setOptions({
+            breaks: true,
+            gfm: true,
+            renderer: renderer
+        });
+
+        function toggleRecording() {
+            if (mediaRecorder && mediaRecorder.state === 'recording') {
+                stopRecording();
+            } else {
+                startRecording();
+            }
+        }
+
+        window.addEventListener('DOMContentLoaded', () => {
+            const nick = localStorage.getItem('agri_nickname');
+            if (nick) loadMainView();
+            else document.getElementById('welcome-view').classList.remove('hidden-view');
+            
+
+            const userInput = document.getElementById('user-input');
+            userInput.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    sendMessage();
+                }
+            });
+        });
+
+        function toggleSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            const overlay = document.getElementById('sidebar-overlay');
+            const isOpen = !sidebar.classList.contains('translate-x-full');
+
+            if (!isOpen) {
+                sidebar.classList.remove('translate-x-full');
+                overlay.classList.add('opacity-100', 'pointer-events-auto');
+            } else {
+                sidebar.classList.add('translate-x-full');
+                overlay.classList.remove('opacity-100', 'pointer-events-auto');
+            }
+        }
+
+        function toggleReasoning(id) {
+            const content = document.getElementById(`reasoning-${id}`);
+            const icon = document.getElementById(`reasoning-icon-${id}`);
+
+            if (content.classList.contains('reasoning-collapsed')) {
+                content.classList.remove('reasoning-collapsed');
+                content.classList.add('reasoning-expanded');
+                icon.classList.add('rotated');
+            } else {
+                content.classList.add('reasoning-collapsed');
+                content.classList.remove('reasoning-expanded');
+                icon.classList.remove('rotated');
+            }
+        }
+
+        function handleInitialSetup() {
+            const nicknameInput = document.getElementById('init-nickname');
+            const regionInput = document.getElementById('init-region');
+            const cropsInput = document.getElementById('init-crops');
+            const remarksInput = document.getElementById('init-remarks');
+
+            const nick = nicknameInput.value.trim() || nicknameInput.dataset.default;
+            const reg = regionInput.value.trim() || regionInput.dataset.default;
+            const crops = cropsInput.value.trim() || cropsInput.dataset.default;
+            const remarks = remarksInput.value.trim();
+
+            if (!nick || !reg || !crops) return alert("请完整填写农场信息");
+            localStorage.setItem('agri_nickname', nick);
+            localStorage.setItem('agri_region', reg);
+            localStorage.setItem('agri_crops', crops);
+            localStorage.setItem('agri_remarks', remarks);
+            loadMainView();
+        }
+
+        function loadMainView() {
+            document.getElementById('welcome-view').classList.add('hidden-view');
+            document.getElementById('main-view').classList.remove('hidden-view');
+            const nick = localStorage.getItem('agri_nickname');
+            const reg = localStorage.getItem('agri_region');
+            const crops = localStorage.getItem('agri_crops');
+            const remarks = localStorage.getItem('agri_remarks') || '';
+            document.getElementById('side-nickname').value = nick;
+            document.getElementById('side-region').value = reg;
+            document.getElementById('side-crops').value = crops;
+            document.getElementById('side-remarks').value = remarks;
+            document.getElementById('header-display-info').innerText = `${reg} • 专注${crops}`;
+            document.getElementById('header-display-title').innerText = `${nick}的四季宝`;
+
+            if (document.getElementById('chat-window').children.length === 0) {
+                addBotMessage(`您好，**${nick}**！欢迎回来。我已经准备好为您在 **${reg}** 种植的 **${crops}** 提供农技支持了。`);
+            }
+        }
+
+        function addBotMessage(text) {
+            const aiId = 'ai-' + Date.now();
+            // 确保text是字符串类型
+            const safeText = typeof text === 'string' ? text : String(text);
+            const aiMsgHtml = `
+                <div class="flex justify-start mb-4 animate-in fade-in">
+                    <div class="bot-bubble p-4 max-w-[66.67%] shadow-sm">
+                        <div id="content-${aiId}" class="markdown-body text-gray-800 text-sm">
+                            ${marked.parse(safeText)}
+                        </div>
+                    </div>
+                </div>`;
+            const chatWindow = document.getElementById('chat-window');
+            chatWindow.insertAdjacentHTML('beforeend', aiMsgHtml);
+            chatWindow.scrollTop = chatWindow.scrollHeight;
+        }
+
+        function updateProfile() {
+            const nick = document.getElementById('side-nickname').value.trim();
+            const reg = document.getElementById('side-region').value.trim();
+            const crops = document.getElementById('side-crops').value.trim();
+            const remarks = document.getElementById('side-remarks').value.trim();
+            if (!nick || !reg || !crops) return alert("信息不能为空");
+            localStorage.setItem('agri_nickname', nick);
+            localStorage.setItem('agri_region', reg);
+            localStorage.setItem('agri_crops', crops);
+            localStorage.setItem('agri_remarks', remarks);
+            document.getElementById('header-display-info').innerText = `${reg} • 专注${crops}`;
+            document.getElementById('header-display-title').innerText = `${nick}的四季宝`;
+            toggleSidebar();
+            addBotMessage(`档案已更新。`);
+        }
+
+        function resetUser() {
+            localStorage.clear();
+            location.reload();
+        }
+
+        function handleImageFile(file) {
+            currentImage = file;
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const container = document.getElementById('image-preview-container');
+                container.innerHTML = `
+                    <img id="image-preview" src="${e.target.result}" class="h-24 w-24 object-cover rounded-2xl border-2 border-[#036C6C] shadow-lg">
+                    <button onclick="clearImage()" class="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center shadow-md">
+                        <i class="fas fa-times text-[10px]"></i>
+                    </button>
+                `;
+                container.classList.remove('hidden');
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function previewFile() {
+            const fileInput = document.getElementById('file-input');
+            const file = fileInput.files[0];
+            if (file) {
+                handleImageFile(file);
+                fileInput.value = '';
+            }
+        }
+
+        function clearImage() {
+            currentImage = null;
+            document.getElementById('file-input').value = '';
+            document.getElementById('image-preview-container').classList.add('hidden');
+        }
+
+        function checkMediaRecorderSupport() {
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                alert('您的浏览器不支持语音录制功能，请使用现代浏览器');
+                return false;
+            }
+            if (!window.MediaRecorder) {
+                alert('您的浏览器不支持MediaRecorder API，请使用现代浏览器');
+                return false;
+            }
+            return true;
+        }
+
+
+        function startRecording() {
+            if (mediaRecorder && mediaRecorder.state === 'recording') return;
+            if (!checkMediaRecorderSupport()) return;
+
+            isPressing = true;
+
+            const recordingButton = document.getElementById('recording-button');
+            recordingButton.classList.remove('bg-gray-100', 'hover:bg-[#036C6C]/10');
+            recordingButton.classList.add('bg-red-100', 'hover:bg-red-200');
+            
+            const micIcon = recordingButton.querySelector('i');
+            micIcon.classList.remove('text-gray-500', 'group-hover:text-[#036C6C]');
+            micIcon.classList.add('text-red-500', 'group-hover:text-red-600');
+
+            navigator.mediaDevices.getUserMedia({ audio: true })
+                .then(stream => {
+                    if (!isPressing) {
+                        stream.getTracks().forEach(track => track.stop());
+                        return;
+                    }
+
+                    const mimeType = MediaRecorder.isTypeSupported('audio/ogg; codecs=opus') ? 'audio/ogg; codecs=opus' :
+                                    MediaRecorder.isTypeSupported('audio/webm; codecs=opus') ? 'audio/webm; codecs=opus' :
+                                    MediaRecorder.isTypeSupported('audio/ogg') ? 'audio/ogg' :
+                                    MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' :
+                                    '';
+
+                    mediaRecorder = new MediaRecorder(stream, mimeType ? { mimeType } : {});
+
+                    audioChunks = [];
+                    recordingDuration = 0;
+
+                    mediaRecorder.ondataavailable = (e) => {
+                        if (e.data.size > 0) {
+                            audioChunks.push(e.data);
+                        }
+                    };
+
+                    mediaRecorder.onstop = () => {
+                        if (audioChunks.length === 0) {
+                            alert('录音失败，请重试');
+                            mediaRecorder = null;
+                            return;
+                        }
+
+                        const audioBlob = new Blob(audioChunks, { type: mediaRecorder.mimeType || 'audio/ogg' });
+
+                        const MAX_AUDIO_SIZE = 10 * 1024 * 1024;
+                        if (audioBlob.size > MAX_AUDIO_SIZE) {
+                            alert('音频文件过大，请控制在10MB以内');
+                            mediaRecorder = null;
+                            return;
+                        }
+
+                        const fileExtension = mediaRecorder.mimeType ? mediaRecorder.mimeType.split('/')[1].split(';')[0] : 'ogg';
+                        currentAudio = new File([audioBlob], `recording.${fileExtension}`, { type: mediaRecorder.mimeType || 'audio/ogg' });
+
+                        showAudioPreview(audioBlob);
+
+                        mediaRecorder = null;
+
+                        sendMessage();
+                    };
+
+                    mediaRecorder.start(1000);
+                    document.getElementById('recording-status').classList.remove('hidden');
+
+                    recordingTimer = setInterval(() => {
+                        recordingDuration++;
+
+                        if (recordingDuration >= MAX_RECORDING_DURATION) {
+                            stopRecording();
+                            return;
+                        }
+
+                        const minutes = Math.floor(recordingDuration / 60);
+                        const seconds = recordingDuration % 60;
+                        const timeString = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+                        document.getElementById('recording-time').textContent = timeString;
+                    }, 1000);
+                })
+                .catch(err => {
+                    isPressing = false;
+                    if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+                        alert('无法访问麦克风，请在浏览器权限中允许访问');
+                    }
+                });
+        }
+
+
+        function stopRecording() {
+            isPressing = false;
+
+            if (!mediaRecorder) return;
+
+            const recordingButton = document.getElementById('recording-button');
+            recordingButton.classList.remove('bg-red-100', 'hover:bg-red-200');
+            recordingButton.classList.add('bg-gray-100', 'hover:bg-[#036C6C]/10');
+            
+            const micIcon = recordingButton.querySelector('i');
+            micIcon.classList.remove('text-red-500', 'group-hover:text-red-600');
+            micIcon.classList.add('text-gray-500', 'group-hover:text-[#036C6C]');
+
+            if (mediaRecorder.state === 'recording') {
+                clearInterval(recordingTimer);
+
+                lastRecordingDuration = recordingDuration;
+                recordingDuration = 0;
+                document.getElementById('recording-time').textContent = '00:00';
+                setTimeout(() => {
+                    if (mediaRecorder && mediaRecorder.state === 'recording') {
+                        mediaRecorder.stop();
+                        mediaRecorder.stream.getTracks().forEach(track => track.stop());
+                    }
+                }, 300);
+                document.getElementById('recording-status').classList.add('hidden');
+            }
+        }
+
+        function showAudioPreview(audioBlob) {
+            const audioUrl = URL.createObjectURL(audioBlob);
+            const audioElement = document.createElement('audio');
+            audioElement.src = audioUrl;
+            audioElement.controls = false;
+            audioElement.classList.add('hidden');
+
+            const durationSpan = document.createElement('span');
+            durationSpan.classList.add('duration');
+            durationSpan.innerHTML = '<i class="fas fa-music"></i> 00:00';
+
+            audioElement.addEventListener('loadedmetadata', () => {
+                const duration = Math.floor(audioElement.duration);
+                const minutes = Math.floor(duration / 60);
+                const seconds = duration % 60;
+                durationSpan.innerHTML = `<i class="fas fa-music"></i> ${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+            });
+
+            audioElement.addEventListener('error', () => {
+                durationSpan.innerHTML = '<i class="fas fa-music"></i> 00:00';
+            });
+
+            document.getElementById('image-preview-container').innerHTML = '';
+            document.getElementById('image-preview-container').appendChild(audioElement);
+            document.getElementById('image-preview-container').appendChild(durationSpan);
+            document.getElementById('image-preview-container').classList.remove('hidden');
+        }
+
+        function clearAudio() {
+            currentAudio = null;
+            document.getElementById('image-preview-container').innerHTML = '';
+            document.getElementById('image-preview-container').classList.add('hidden');
+        }
+
+        function openImageModal(imageSrc) {
+            const modal = document.getElementById('image-modal');
+            const modalImage = document.getElementById('modal-image');
+            modalImage.src = imageSrc;
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+            document.body.style.overflow = 'hidden';
+        }
+
+        function closeImageModal() {
+            const modal = document.getElementById('image-modal');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+            document.body.style.overflow = 'auto';
+        }
+
+        function setInputControlsDisabled(disabled) {
+            const fileInput = document.getElementById('file-input');
+            const cameraLabel = document.getElementById('camera-label');
+            const recordingButton = document.getElementById('recording-button');
+            const userInput = document.getElementById('user-input');
+            const sendBtn = document.getElementById('send-btn');
+            
+            fileInput.disabled = disabled;
+            recordingButton.disabled = disabled;
+            userInput.disabled = disabled;
+            sendBtn.disabled = disabled;
+            
+
+            if (disabled) {
+                cameraLabel.classList.add('opacity-50', 'cursor-not-allowed');
+                recordingButton.classList.add('opacity-50', 'cursor-not-allowed');
+                userInput.classList.add('opacity-50', 'cursor-not-allowed');
+                sendBtn.classList.add('opacity-50', 'cursor-not-allowed');
+            } else {
+                cameraLabel.classList.remove('opacity-50', 'cursor-not-allowed');
+                recordingButton.classList.remove('opacity-50', 'cursor-not-allowed');
+                userInput.classList.remove('opacity-50', 'cursor-not-allowed');
+                sendBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+            }
+        }
+
+        async function sendMessage() {
+            const input = document.getElementById('user-input');
+            const rawPrompt = input.value.trim();
+            const imageFile = currentImage;
+            const audioFile = currentAudio;
+            if (audioFile && audioFile.size === 0) {
+                alert('音频文件为空，请重新录音');
+                return;
+            }
+            if (!rawPrompt && !imageFile && !audioFile) return;
+
+            setInputControlsDisabled(true);
+
+            const chatWindow = document.getElementById('chat-window');
+
+            let userAudioHtml = '';
+            let transcriptId = null;
+            if (currentAudio) {
+                transcriptId = Date.now();
+                userAudioHtml = `
+                    <div class="wechat-audio-wrapper">
+                        <div class="flex items-center">
+                            <i class="fas fa-microphone text-white/80"></i>
+                        </div>
+                        <div class="flex-1">
+                            <div class="flex items-center space-x-2">
+                                <span class="text-white text-sm">语音消息</span>
+                                <span class="text-white/70 text-xs">${lastRecordingDuration}秒</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="transcript-container" style="margin-top: 0.5rem; margin-left: 0.75rem;">
+                        <div class="transcript expanded" id="transcript-${transcriptId}">
+                            <span class="transcript-text">正在识别语音...</span>
+                        </div>
+                    </div>
+                `;
+            }
+
+            let userMsgHtml = `
+                <div class="flex justify-end mb-4 animate-in fade-in slide-in-from-right-4">
+                    <div class="user-bubble text-white p-4 max-w-[85%] shadow-sm">
+                        ${currentImage ? `<img src="${document.getElementById('image-preview').src}" class="rounded-xl mb-2 max-w-full h-auto object-contain cursor-pointer" onclick="openImageModal('${document.getElementById('image-preview').src}')">` : ''}
+                        ${userAudioHtml}
+                        ${rawPrompt ? `<p class="whitespace-pre-wrap text-sm leading-relaxed">${rawPrompt}</p>` : ''}
+                    </div>
+                </div>`;
+            chatWindow.insertAdjacentHTML('beforeend', userMsgHtml);
+
+            const aiId = 'ai-' + Date.now();
+            const aiMsgHtml = `
+                <div class="flex justify-start mb-4 animate-in fade-in">
+                    <div class="bot-bubble p-4 max-w-[66.67%] shadow-sm">
+                        <div id="reasoning-container-${aiId}" class="hidden">
+                            <button onclick="toggleReasoning('${aiId}')" class="flex items-center space-x-2 text-xs text-gray-400 hover:text-[#036C6C] transition-colors mb-1">
+                                <i id="reasoning-icon-${aiId}" class="fas fa-chevron-right rotate-icon"></i>
+                                <span class="font-bold uppercase tracking-wider">思考过程</span>
+                            </button>
+                            <div id="reasoning-${aiId}" class="markdown-body reasoning-markdown reasoning-content reasoning-collapsed hide-scrollbar"></div>
+                        </div>
+                        <div class="w-full h-px bg-gray-200 my-2"></div>
+                        <div id="content-${aiId}" class="markdown-body text-gray-800 text-sm">
+                            <span class="thinking-dot text-[#036C6C] font-bold">${currentAudio ? '● 等待中...' : '● 思考中...'}</span>
+                        </div>
+                    </div>
+                </div>`;
+            chatWindow.insertAdjacentHTML('beforeend', aiMsgHtml);
+            chatWindow.scrollTop = chatWindow.scrollHeight;
+
+            if (currentAudio) {
+                currentTranscriptId = transcriptId;
+            }
+
+            const remarks = localStorage.getItem('agri_remarks');
+            const remarksInfo = remarks ? ` | 备注：${remarks}` : '';
+            const finalPrompt = `【用户：${localStorage.getItem('agri_nickname')} | 地区：${localStorage.getItem('agri_region')} | 种植：${localStorage.getItem('agri_crops')}${remarksInfo}】\n${rawPrompt}`;
+            const formData = new FormData();
+            formData.append('prompt', finalPrompt);
+            if (imageFile) formData.append('image', imageFile);
+            if (audioFile) formData.append('audio', audioFile);
+
+            input.value = '';
+            input.style.height = 'auto';
+            clearImage();
+            clearAudio();
+
+            try {
+                let retries = 3;
+                let response;
+
+                while (retries > 0) {
+                    try {
+                        const controller = new AbortController();
+                        const timeoutId = setTimeout(() => controller.abort(), 30000);
+
+                        response = await fetch('/chat-stream', {
+                            method: 'POST',
+                            body: formData,
+                            headers: { 'Accept': 'text/event-stream' },
+                            signal: controller.signal
+                        });
+
+                        clearTimeout(timeoutId);
+                        break;
+                    } catch (err) {
+                        retries--;
+                        if (retries === 0) throw err;
+                        document.getElementById(`content-${aiId}`).innerText = `网络连接不稳定，正在重试(${3 - retries}/3)...`;
+                        await new Promise(resolve => setTimeout(resolve, 1000));
+                    }
+                }
+
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                let fullReasoning = "", fullAnswer = "", hasStartedAnswer = false;
+                let audioTranscript = "";
+
+                while (true) {
+                    const { value, done } = await reader.read();
+                    if (done) break;
+                    const lines = decoder.decode(value).split('\n');
+                    for (const line of lines) {
+                        if (line.startsWith('data: ')) {
+                            try {
+                                const data = JSON.parse(line.substring(6));
+                                if (data.type === 'reasoning') {
+                                    document.getElementById(`reasoning-container-${aiId}`).classList.remove('hidden');
+                                    fullReasoning += data.content;
+                                    const reasoningElement = document.getElementById(`reasoning-${aiId}`);
+                                    reasoningElement.innerHTML = marked.parse(fullReasoning);
+                                    reasoningElement.scrollTop = reasoningElement.scrollHeight;
+                                } else if (data.type === 'transcript') {
+                                    audioTranscript = data.content;
+                                    if (currentTranscriptId) {
+                                        const transcriptElement = document.getElementById(`transcript-${currentTranscriptId}`);
+                                        if (transcriptElement) {
+                                            const textSpan = transcriptElement.querySelector('.transcript-text');
+                                            if (textSpan) {
+                                                textSpan.innerText = audioTranscript && audioTranscript.trim() ? audioTranscript : '[无有效内容]';
+                                            }
+                                        }
+                                    }
+                                    const contentElement = document.getElementById(`content-${aiId}`);
+                                    if (contentElement) {
+                                        contentElement.innerHTML = '<span class="thinking-dot text-[#036C6C] font-bold">● 思考中...</span>';
+                                    }
+                                } else if (data.type === 'answer') {
+                                    if (!hasStartedAnswer) {
+                                        document.getElementById(`content-${aiId}`).innerHTML = '';
+                                        hasStartedAnswer = true;
+                                    }
+                                    fullAnswer += data.content;
+                                    const safeAnswer = typeof fullAnswer === 'string' ? fullAnswer : String(fullAnswer);
+                                    document.getElementById(`content-${aiId}`).innerHTML = marked.parse(safeAnswer);
+                                    chatWindow.scrollTop = chatWindow.scrollHeight;
+                                } else if (data.type === 'error') {
+                                    document.getElementById(`content-${aiId}`).innerHTML = `<span class="text-red-500 font-bold"><i class="fas fa-exclamation-circle"></i> ${data.content}</span>`;
+                                }
+                            } catch (e) {
+                                console.error("JSON解析错误:", e, line);
+                            }
+                        }
+                    }
+                }
+
+                document.querySelectorAll('pre code').forEach((block) => {
+                    hljs.highlightElement(block);
+                });
+
+            } catch (error) {
+                console.error("请求发生异常:", error);
+                document.getElementById(`content-${aiId}`).innerHTML = `<span class="text-red-500 font-bold"><i class="fas fa-wifi"></i> 网络连接失败或请求超时，请检查后台服务是否启动。</span>`;
+            } finally {
+                setInputControlsDisabled(false);
+            }
+        }
+    </script>
+</body>
+</html>

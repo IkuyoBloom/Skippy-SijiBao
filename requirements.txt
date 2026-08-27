@@ -1,0 +1,11 @@
+# 四季宝农技大脑 - 后端依赖
+# 注意：语音识别依赖 ffmpeg/ffprobe，请自行下载放入 backend/bin/ 目录
+fastapi
+uvicorn
+sse-starlette
+python-multipart
+python-dotenv
+openai
+requests
+websockets
+pydub

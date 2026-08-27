@@ -1,0 +1,21 @@
+# 密钥与证书（严禁提交）
+.env
+backend/cert.pem
+backend/key.pem
+*.pem
+
+# ffmpeg 二进制（体积过大，请自行放置 backend/bin/ 目录）
+backend/bin/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# IDE
+.idea/
+
+# 系统
+.DS_Store
+Thumbs.db
